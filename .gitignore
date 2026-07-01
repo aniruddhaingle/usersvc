@@ -1,0 +1,18 @@
+# compiled binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/api
+/worker
+/bin/
+
+# test and coverage output
+*.test
+*.out
+
+# local env files
+.env
+.env.*
+*.env.local
