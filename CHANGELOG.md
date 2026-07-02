@@ -7,3 +7,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-01T10:38:00+05:30 - add initial Go module files
 - 2026-07-01T12:05:00+05:30 - add user domain model
 - 2026-07-01T16:42:00+05:30 - add environment config loader
+- 2026-07-02T08:56:00+05:30 - add migration filesystem
