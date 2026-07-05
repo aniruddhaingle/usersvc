@@ -15,3 +15,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-04T10:14:00+05:30 - add user service layer
 - 2026-07-04T17:36:00+05:30 - add HTTP handlers
 - 2026-07-05T09:49:00+05:30 - add logging and recovery middleware
+- 2026-07-05T15:22:00+05:30 - add API entrypoint
