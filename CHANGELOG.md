@@ -17,3 +17,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-05T09:49:00+05:30 - add logging and recovery middleware
 - 2026-07-05T15:22:00+05:30 - add API entrypoint
 - 2026-07-06T10:03:00+05:30 - add worker entrypoint
+- 2026-07-06T18:11:00+05:30 - add Docker runtime files
