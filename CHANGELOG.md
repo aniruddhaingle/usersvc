@@ -20,3 +20,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-06T18:11:00+05:30 - add Docker runtime files
 - 2026-07-07T14:28:00+05:30 - add initial backend README
 - 2026-07-08T09:35:00+05:30 - register pgx SQL driver and migration handling
+- 2026-07-08T16:09:00+05:30 - fix repository id lookup and delete semantics
