@@ -2,12 +2,14 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/fs"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // i didn't directly use sql.DB everywhere bcz it is possiblr that at a later stage i would want to may be add a mutex which may break the app so just thought of keeping a low cost abstraction for future usability
@@ -45,8 +47,11 @@ func run_migs(db *sql.DB, migfs fs.FS) error {
 	}
 
 	m, err := migrate.NewWithInstance("iofs", src, "postgres", drvr)
+	if err != nil {
+		return fmt.Errorf("mig instance couldnt be created: %w", err)
+	}
 
-	if err := m.Up(); err != nil {
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migration oculd not be run up: %w", err)
 	}
 	return nil
