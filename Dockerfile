@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -17,12 +17,4 @@ WORKDIR /app
 COPY --from=builder /bin/api /app/api
 COPY --from=builder /bin/worker /app/worker
 
-CMD ["/app/api"]
-
-FROM gcr.io/distroless/base-debian12
-
-WORKDIR /app
-
-COPY --from=builder /bin/api /app/api
-COPY --from=builder /bin/worker /app/worker
 CMD ["/app/api"]
