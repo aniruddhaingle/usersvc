@@ -23,3 +23,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-08T16:09:00+05:30 - fix repository id lookup and delete semantics
 - 2026-07-09T11:44:00+05:30 - clean Go dependencies
 - 2026-07-09T19:30:00+05:30 - align Docker build with module version
+- 2026-07-10T13:17:00+05:30 - tighten compose worker restart policy
