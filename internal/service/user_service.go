@@ -1,28 +1,44 @@
 package service
 
 import (
-	"adv-bknd/internal/domain"
-	"adv-bknd/internal/infrastructure"
-	"adv-bknd/internal/repository"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"log/slog"
 	"time"
+	"usersvc/internal/domain"
+	"usersvc/internal/repository"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/sync/singleflight"
 )
 
+type UserRepo interface {
+	Create(ctx context.Context, user *domain.User) error
+	GetUserById(ctx context.Context, id string) (*domain.User, error)
+	ListUsers(ctx context.Context) ([]*domain.User, error)
+	DeleteUser(ctx context.Context, id string) error
+}
+
+type Cache interface {
+	Set(ctx context.Context, key string, value any, exp time.Duration) error
+	Get(ctx context.Context, key string) (string, error)
+	Del(ctx context.Context, key string) error
+}
+
+type EventPublisher interface {
+	Publish(ctx context.Context, body []byte) error
+}
+
 type UserService struct {
-	repo     *repository.UserRepository
-	redis    *infrastructure.RedisClient
-	rabbitmq *infrastructure.RabbitMQClient
+	repo     UserRepo
+	redis    Cache
+	rabbitmq EventPublisher
 	sf       singleflight.Group
 }
 
-func NewUserService(repo *repository.UserRepository, redis *infrastructure.RedisClient, rabbitmq *infrastructure.RabbitMQClient) *UserService {
+func NewUserService(repo UserRepo, redis Cache, rabbitmq EventPublisher) *UserService {
 	return &UserService{
 		repo: repo, redis: redis, rabbitmq: rabbitmq,
 	}
@@ -59,6 +75,9 @@ func (u *UserService) Register(ctx context.Context, email string, passwd string)
 func (u *UserService) GetUser(ctx context.Context, userID string) (*domain.User, error) {
 	ckey := "user:" + userID
 	dataFound, err := u.redis.Get(ctx, ckey)
+	if err != nil {
+		slog.Warn("cache read failed", "key", ckey, "error", err)
+	}
 	if err == nil && dataFound != "" {
 		var user domain.User
 		if err := json.Unmarshal([]byte(dataFound), &user); err == nil {
@@ -72,11 +91,13 @@ func (u *UserService) GetUser(ctx context.Context, userID string) (*domain.User,
 			return nil, err
 		}
 		if user == nil {
-			return nil, errors.New("user not found")
+			return nil, fmt.Errorf("get user %s: %w", userID, repository.ErrUserNotFound)
 		}
 		//set the cache for future requests
 		prsd, _ := json.Marshal(user)
-		u.redis.Set(ctx, ckey, string(prsd), time.Minute*10)
+		if err := u.redis.Set(ctx, ckey, string(prsd), time.Minute*10); err != nil {
+			slog.Warn("cache set failed", "key", ckey, "error", err)
+		}
 		return user, nil
 	})
 	if err != nil {
@@ -84,6 +105,10 @@ func (u *UserService) GetUser(ctx context.Context, userID string) (*domain.User,
 	}
 
 	return val.(*domain.User), nil
+}
+
+func (u *UserService) ListUsers(ctx context.Context) ([]*domain.User, error) {
+	return u.repo.ListUsers(ctx)
 }
 
 func (u *UserService) DeleteUser(ctx context.Context, userID string) error {

@@ -25,3 +25,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-09T19:30:00+05:30 - align Docker build with module version
 - 2026-07-10T13:17:00+05:30 - tighten compose worker restart policy
 - 2026-07-11T08:40:00+05:30 - add repository sentinel errors
+- 2026-07-11T12:58:00+05:30 - introduce service interfaces
