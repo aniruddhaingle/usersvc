@@ -1,11 +1,12 @@
 package http
 
 import (
-	"adv-bknd/internal/service"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
-	"strings"
+	"usersvc/internal/repository"
+	"usersvc/internal/service"
 )
 
 type Handler struct {
@@ -18,8 +19,15 @@ func NewHandler(service *service.UserService) *Handler {
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /users", h.CreateUser)
+	mux.HandleFunc("GET /users", h.ListUsers)
 	mux.HandleFunc("GET /users/{id}", h.GetUser)
-	mux.HandleFunc("DELETE /users", h.DeleteUser)
+	mux.HandleFunc("DELETE /users/{id}", h.DeleteUser)
+	mux.HandleFunc("GET /health", h.Health)
+}
+
+func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"ok"}`))
 }
 
 type CreateUserRequest struct {
@@ -35,7 +43,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	usr, err := h.service.Register(r.Context(), req.Email, req.Password)
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "SQLSTATE 23505") {
+		if errors.Is(err, repository.ErrDuplicateEmail) {
 			http.Error(w, "email already exists", http.StatusConflict)
 			return
 		}
@@ -47,6 +55,16 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(usr)
 }
 
+func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.service.ListUsers(r.Context())
+	if err != nil {
+		slog.Error("couldnt list users", "error", err)
+		http.Error(w, "Internal Server error", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(users)
+}
+
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
@@ -55,7 +73,7 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 	usr, err := h.service.GetUser(r.Context(), id)
 	if err != nil {
-		if err.Error() == "user not found" {
+		if errors.Is(err, repository.ErrUserNotFound) {
 			http.Error(w, "couldnt find any such user", http.StatusNotFound)
 			return
 		}
@@ -74,8 +92,12 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.service.DeleteUser(r.Context(), id); err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			http.Error(w, "couldnt find any such user", http.StatusNotFound)
+			return
+		}
 		slog.Error("couldnt delete the user", "error", err)
-		http.Error(w, "couldnt find any such user", http.StatusNotFound)
+		http.Error(w, "Internal Server error", http.StatusInternalServerError)
 		return
 
 	}
