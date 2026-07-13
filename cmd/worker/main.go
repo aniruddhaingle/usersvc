@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"adv-bknd/internal/config"
-	"adv-bknd/internal/infrastructure"
+	"usersvc/internal/config"
+	"usersvc/internal/infrastructure"
 )
 
 func main() {
@@ -22,9 +22,17 @@ func main() {
 		os.Exit(1)
 	}
 	//rbmq only for wrkr
-	rabbitClient, err := infrastructure.NewRabbitMQClient(cfg.RabbitMQURL)
+	var rabbitClient *infrastructure.RabbitMQClient
+	for i := 0; i < 10; i++ {
+		rabbitClient, err = infrastructure.NewRabbitMQClient(cfg.RabbitMQURL)
+		if err == nil {
+			break
+		}
+		slog.Info("waiting for rabbitmq", "attempt", i+1, "error", err)
+		time.Sleep(2 * time.Second)
+	}
 	if err != nil {
-		slog.Error("failed to connect to rabbitmq", "error", err)
+		slog.Error("failed to connect to rabbitmq after retries", "error", err)
 		os.Exit(1)
 	}
 	defer rabbitClient.Close()
@@ -45,8 +53,8 @@ func main() {
 		for d := range msgs {
 			var event map[string]interface{}
 			if err := json.Unmarshal(d.Body, &event); err != nil {
-				slog.Error("failed to unmarshal message", "error", err)
-				d.Ack(false)
+				slog.Error("failed to unmarshal message", "error", err, "body", string(d.Body))
+				d.Nack(false, false)
 				continue
 			}
 

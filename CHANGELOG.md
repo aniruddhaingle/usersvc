@@ -29,3 +29,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-12T10:26:00+05:30 - use errors.Is for service error handling
 - 2026-07-12T18:06:00+05:30 - return precise HTTP conflict and not found responses
 - 2026-07-13T09:51:00+05:30 - add graceful API shutdown
+- 2026-07-13T16:34:00+05:30 - harden worker message failure handling
