@@ -1,17 +1,21 @@
 package main
 
 import (
-	"adv-bknd/internal/config"
-	"adv-bknd/internal/infrastructure"
-	"adv-bknd/internal/repository"
-	"adv-bknd/internal/service"
-	transport "adv-bknd/internal/transport/http"
-	"adv-bknd/migrations"
-	"log"
+	"context"
+	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
+	"usersvc/internal/config"
+	"usersvc/internal/infrastructure"
+	"usersvc/internal/repository"
+	"usersvc/internal/service"
+	transport "usersvc/internal/transport/http"
+	"usersvc/migrations"
 )
 
 func main() {
@@ -56,6 +60,31 @@ func main() {
 	}
 	defer rabbitClient.Close()
 
+	//run the worker inside the api when the host has no separate worker process (eg render free tier)
+	if os.Getenv("EMBED_WORKER") == "true" {
+		msgs, err := rabbitClient.Consume()
+		if err != nil {
+			slog.Error("failed to start embedded consumer", "error", err)
+			os.Exit(1)
+		}
+		go func() {
+			for d := range msgs {
+				var event map[string]interface{}
+				if err := json.Unmarshal(d.Body, &event); err != nil {
+					slog.Error("failed to unmarshal message", "error", err, "body", string(d.Body))
+					d.Nack(false, false)
+					continue
+				}
+				slog.Info("Event processed",
+					"user_id", event["user_id"],
+					"queue_name", "user_events",
+				)
+				d.Ack(false)
+			}
+		}()
+		slog.Info("embedded worker started")
+	}
+
 	//wiringg
 	userRepo := repository.NewUserRepository(db)
 	userService := service.NewUserService(userRepo, redisClient, rabbitClient)
@@ -70,8 +99,26 @@ func main() {
 		transport.RecoveryMiddleware(mux),
 	)
 
-	slog.Info("starting server", "port", cfg.HTTPPort)
-	if err := http.ListenAndServe(":"+cfg.HTTPPort, wrappedRouter); err != nil {
-		log.Fatalf("server failed: %v", err)
+	srv := &http.Server{Addr: ":" + cfg.HTTPPort, Handler: wrappedRouter}
+
+	//chan to handle graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		slog.Info("starting server", "port", cfg.HTTPPort)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	<-stop
+	slog.Info("shutting down server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("server shutdown failed", "error", err)
 	}
+	slog.Info("server stopped gracefully")
 }
