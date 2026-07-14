@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -34,7 +35,11 @@ func (r *RedisClient) Set(ctx context.Context, key string, value any, exp time.D
 }
 
 func (r *RedisClient) Get(ctx context.Context, key string) (string, error) {
-	return r.client.Get(ctx, key).Result()
+	res, err := r.client.Get(ctx, key).Result()
+	if errors.Is(err, redis.Nil) {
+		return "", nil
+	}
+	return res, err
 }
 
 func (r *RedisClient) Del(ctx context.Context, key string) error {
