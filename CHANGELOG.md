@@ -33,3 +33,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-14T11:07:00+05:30 - add worker RabbitMQ connection retry
 - 2026-07-14T20:18:00+05:30 - treat Redis misses as clean cache misses
 - 2026-07-15T09:13:00+05:30 - log cache read and write failures
+- 2026-07-15T15:49:00+05:30 - add repository list users query
