@@ -37,3 +37,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-16T10:32:00+05:30 - wire ListUsers through service
 - 2026-07-16T18:05:00+05:30 - add GET users route
 - 2026-07-17T08:44:00+05:30 - add user service tests
+- 2026-07-17T14:31:00+05:30 - cover cache hit miss and singleflight behavior
