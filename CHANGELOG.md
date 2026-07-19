@@ -41,3 +41,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-18T09:58:00+05:30 - add HTTP handler tests
 - 2026-07-18T13:42:00+05:30 - cover duplicate email and unknown id responses
 - 2026-07-19T11:19:00+05:30 - rename module to usersvc
+- 2026-07-19T17:27:00+05:30 - refresh backend README after cleanup
