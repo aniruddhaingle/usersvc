@@ -1,8 +1,15 @@
-﻿# User Management Service
+# User Management Service
 
-A high-performance, production-grade User Management Microservice built with **Go 1.24+**.
+A high-performance, production-grade User Management Microservice built with **Go 1.25+**.
 
-This project demonstrates **Advanced Backend Engineering** concepts including Clean Architecture, Distributed Caching, Event-Driven Messaging, and Resiliency Patterns.
+This project demonstrates **Advanced Backend Engineering** concepts including Clean Architecture, Distributed Caching, Event-Driven Messaging, and Resiliency Patterns — with a React frontend on top.
+
+## Live Demo
+
+- **App**: [usersvc.vercel.app](https://usersvc.vercel.app) — React frontend (Vercel)
+- **API**: [usersvc.onrender.com](https://usersvc.onrender.com/health) — Go API + worker (Render), backed by Neon Postgres, Upstash Redis, and CloudAMQP
+
+> The API sleeps after 15 idle minutes on the free tier — the first request may take ~30–60s to wake it.
 
 ---
 
@@ -16,16 +23,17 @@ This project demonstrates **Advanced Backend Engineering** concepts including Cl
 | **Cache** | **Redis** | Distributed Cache (Cache-Aside Pattern) |
 | **Messaging** | **RabbitMQ** | Asynchronous Event Bus (AMQP) |
 | **Resiliency** | **Singleflight** | Cache Stampede Protection |
-| **Deployment** | **Docker Compose** | Container Orchestration |
+| **Frontend** | **React + Vite** | Admin UI (served by nginx) |
+| **Deployment** | **Docker Compose** (local) / **Render + Vercel** (cloud) | Container Orchestration |
 
 ---
 
-##  Key Features
+## Key Features
 
 ### 1. Clean Architecture
 Separation of concerns is mostly strict:
 -   **Transport**: HTTP Handlers & Middleware.
--   **Service**: Business Logic (Hashing, Caching, Event Publishing).
+-   **Service**: Business Logic (Hashing, Caching, Event Publishing) — depends only on interfaces.
 -   **Repository**: Raw SQL Queries (`database/sql`).
 -   **Domain**: Pure Go structs.
 
@@ -35,34 +43,50 @@ Separation of concerns is mostly strict:
 
 ### 3. Event-Driven (Async)
 -   **Critical Path**: DB Creation is synchronous (User gets 201 Created immediately).
--   **Background Path**: RabbitMQ Event is published. A separate **Worker Process** consumes this event to handle slow tasks (e.g., Welcome Emails, Analytics) without blocking the API.
+-   **Background Path**: RabbitMQ Event is published. A separate **Worker Process** consumes this event to handle slow tasks (e.g., Welcome Emails, Analytics) without blocking the API. Malformed messages are Nacked (no requeue) instead of silently dropped.
+-   On single-process hosts, `EMBED_WORKER=true` runs the consumer inside the API binary.
 
 ### 4. Graceful Shutdown
--   The worker intercepts `SIGTERM`/`SIGINT`.
--   It stops accepting new tasks but **waits** for in-flight tasks to finish processing before exiting.
--   Prevents data corruption and dropped jobs during deployments.
+-   Both the API (`http.Server.Shutdown` with a timeout context) and the worker intercept `SIGTERM`/`SIGINT`.
+-   In-flight requests/tasks finish before exit — no dropped jobs during deployments.
+
+### 5. Typed Errors
+-   Sentinel errors (`ErrUserNotFound`, `ErrDuplicateEmail`) matched with `errors.Is` — no string matching.
+-   Duplicate emails are detected via the Postgres driver's error type (SQLSTATE 23505), surfaced as **409 Conflict**.
+
+### 6. Tested
+-   Unit tests with hand-written fakes (no mocking frameworks), run with `go test ./... -race`.
+-   Includes a concurrency test asserting that N concurrent cache misses collapse into **exactly one** repository call.
 
 ---
 
+## Benchmark
 
-logs of testing using bombardier (i know this is cache read and not db writes, its bcz i wanted to know the best performance of the system. if we were to try diff user id's each time, it'd settile around 1k-2k RPS max bcz then  we are involving bcrypt,marshalling,DB R/W that takes some time)
-```ps1
-PS C:\Users\vaswa\Desktop\placemet_projs\go_adv_proj_1> bombardier -c 100 -d 10s -p r -l http://localhost:8080/users/89af8930-24b3-4d17-8906-254894b7e591
-Statistics        Avg      Stdev        Max
-  Reqs/sec     11842.59    3527.45   18250.99
-  Latency        8.45ms    13.46ms   822.55ms
-  Latency Distribution
-     50%     7.29ms
-     75%     9.85ms
-     90%    12.94ms
-     95%    15.54ms
-     99%    23.03ms
-  HTTP codes:
-    1xx - 0, 2xx - 118210, 3xx - 0, 4xx - 0, 5xx - 0
-    others - 0
-  Throughput:     3.91MB/s
+`GET /users/{id}` (cached path), 100 concurrent connections for 10s — measured on a 2-core i3-1115G4 laptop running the **entire stack + the load generator** simultaneously:
 
 ```
+Statistics        Avg      Stdev        Max
+  Reqs/sec      4202.09    1875.94    8938.19
+  Latency       23.75ms    13.72ms   283.11ms
+  Latency Distribution
+     50%    20.57ms
+     75%    28.64ms
+     90%    38.17ms
+     95%    47.16ms
+     99%    73.13ms
+  HTTP codes:  2xx - 42140, 4xx - 0, 5xx - 0
+  Throughput:  1.39MB/s
+```
+
+> Honest note: this is the cache-read path — it shows the ceiling of the system. Hammering writes or unique ids each time would settle lower, because then bcrypt, marshalling, and DB R/W get involved. Zero errors across 42K requests is the singleflight + cache-aside design doing its job.
+
+Reproduce it yourself:
+
+```bash
+docker run --rm alpine/bombardier -c 100 -d 10s -l http://host.docker.internal:8080/users/{USER_ID}
+```
+
+---
 
 ## Getting Started
 
@@ -70,25 +94,40 @@ Statistics        Avg      Stdev        Max
 -   Docker & Docker Compose
 
 ### Run the Stack
+
 ```bash
-# Starts API, Worker, Postgres, Redis, RabbitMQ
+# Starts API, Worker, Frontend, Postgres, Redis, RabbitMQ
 docker-compose up --build
 ```
-The API is now running on `localhost:8080`.
+
+-   API: `localhost:8080`
+-   Frontend: `localhost:3000`
+-   RabbitMQ management UI: `localhost:15672` (guest/guest)
 
 ---
 
 ## API Usage
 
+| Method | Route | Result |
+| :--- | :--- | :--- |
+| `POST` | `/users` | `201` + user, `409` on duplicate email |
+| `GET` | `/users` | `200` + all users |
+| `GET` | `/users/{id}` | `200` + user, `404` if unknown |
+| `DELETE` | `/users/{id}` | `204`, `404` if unknown |
+| `GET` | `/health` | `200` `{"status":"ok"}` |
+
 ### 1. Create User
+
 ```bash
 curl -X POST http://localhost:8080/users \
   -H "Content-Type: application/json" \
   -d '{"email": "engineer@example.com", "password": "securePass123"}'
 ```
+
 **Response**: `201 Created` with User ID.
 
 ### 2. Get User (Test Caching)
+
 ```bash
 #1st call (db hit -> cache write will happen)
 curl http://localhost:8080/users/{USER_ID}
@@ -98,10 +137,22 @@ curl http://localhost:8080/users/{USER_ID}
 ```
 
 ### 3. Delete User
+
 ```bash
 curl -X DELETE http://localhost:8080/users/{USER_ID}
 ```
+
 **Effect**: Removes user from **both** PostgreSQL and Redis.
+
+---
+
+## Tests
+
+```bash
+go test ./... -race
+```
+
+Covers: cached reads bypass the repository, cache population on miss, singleflight collapsing N concurrent misses into one DB call, and handler status codes (404 unknown id, 409 duplicate email).
 
 ---
 
@@ -109,18 +160,28 @@ curl -X DELETE http://localhost:8080/users/{USER_ID}
 
 ### Verify Graceful Shutdown
 1.  Navigate to `cmd/worker/main.go`.
-2.  Uncomment the `time.Sleep(10 * time.Second)` line to simulate a slow task.
+2.  Raise the `time.Sleep` in the consumer loop (e.g. to 10s) to simulate a slow task.
 3.  Trigger a user creation.
 4.  Immediately run `docker stop <worker_container_id>`.
-5.  **Observation**: The container will NOT stop immediately. It will wait for the 10s task to finish, then log "Stopped Gracefully".
+5.  **Observation**: The container will NOT stop immediately. It waits for the in-flight task to finish, then logs "worker stopped gracefully".
+
+---
+
+## Deployment
+
+-   **[render.yaml](render.yaml)** — Render Blueprint for the API (Docker runtime, `/health` health check, `EMBED_WORKER=true` so the worker rides inside the API process on the free tier).
+-   **[frontend/vercel.json](frontend/vercel.json)** — Vercel config: Vite build + a rewrite that proxies `/api/*` to the Render API (no CORS needed).
+-   Backing services: Neon (Postgres), Upstash (Redis), CloudAMQP (RabbitMQ) — all free tiers.
+-   Push to `main` → Render rebuilds the API and Vercel rebuilds the frontend automatically.
 
 ---
 
 ## Directory Structure
+
 ```
 .
 ├── cmd/
-│   ├── api/            # REST API Main entrypoint
+│   ├── api/            # REST API Main entrypoint (+ optional embedded worker)
 │   └── worker/         # Background Worker Main entrypoint
 ├── internal/
 │   ├── config/         # Env loading
@@ -129,477 +190,9 @@ curl -X DELETE http://localhost:8080/users/{USER_ID}
 │   ├── repository/     # SQL Logic
 │   ├── service/        # Business Logic (The Glue)
 │   └── transport/      # HTTP Handlers
+├── frontend/           # React + Vite admin UI (nginx-served in Docker)
 ├── migrations/         # SQL Migration files (Embedded)
 ├── docker-compose.yml  # Infrastructure definition
+├── render.yaml         # Render deployment blueprint
 └── Dockerfile          # Multi-stage build
 ```
-
-
-<!-- Code generated by gomarkdoc. DO NOT EDIT -->
-
-# migrations
-
-```go
-import "adv-bknd/migrations"
-```
-
-## Index
-
-- [Variables](<#variables>)
-
-
-## Variables
-
-<a name="FS"></a>
-
-```go
-var FS embed.FS
-```
-
-# api
-
-```go
-import "adv-bknd/cmd/api"
-```
-
-## Index
-
-
-
-# worker
-
-```go
-import "adv-bknd/cmd/worker"
-```
-
-## Index
-
-
-
-# config
-
-```go
-import "adv-bknd/internal/config"
-```
-
-## Index
-
-- [type Config](<#Config>)
-  - [func Load\(\) \(\*Config, error\)](<#Load>)
-
-
-<a name="Config"></a>
-## type Config
-
-
-
-```go
-type Config struct {
-    DBURL       string
-    RedisURL    string
-    RabbitMQURL string
-    HTTPPort    string
-}
-```
-
-<a name="Load"></a>
-### func Load
-
-```go
-func Load() (*Config, error)
-```
-
-Why did i use "method muation" vs "factory functions" \- ensure that the cfg now doesn't have any half upated config \\n \- its cleanr to init a var as a result of func calling \-
-
-# domain
-
-```go
-import "adv-bknd/internal/domain"
-```
-
-## Index
-
-- [type User](<#User>)
-
-
-<a name="User"></a>
-## type User
-
-
-
-```go
-type User struct {
-    ID           string    `json:"id"`
-    Email        string    `json:"email"`
-    PasswordHash string    `json:"-"`
-    CreatedAt    time.Time `json:"created_at"`
-}
-```
-
-# infrastructure
-
-```go
-import "adv-bknd/internal/infrastructure"
-```
-
-## Index
-
-- [type RabbitMQClient](<#RabbitMQClient>)
-  - [func NewRabbitMQClient\(url string\) \(\*RabbitMQClient, error\)](<#NewRabbitMQClient>)
-  - [func \(r \*RabbitMQClient\) Close\(\)](<#RabbitMQClient.Close>)
-  - [func \(r \*RabbitMQClient\) Consume\(\) \(\<\-chan amqp091.Delivery, error\)](<#RabbitMQClient.Consume>)
-  - [func \(r \*RabbitMQClient\) Publish\(ctx context.Context, body \[\]byte\) error](<#RabbitMQClient.Publish>)
-- [type RedisClient](<#RedisClient>)
-  - [func NewRedisClient\(url string\) \(\*RedisClient, error\)](<#NewRedisClient>)
-  - [func \(r \*RedisClient\) Del\(ctx context.Context, key string\) error](<#RedisClient.Del>)
-  - [func \(r \*RedisClient\) Get\(ctx context.Context, key string\) \(string, error\)](<#RedisClient.Get>)
-  - [func \(r \*RedisClient\) Set\(ctx context.Context, key string, value any, exp time.Duration\) error](<#RedisClient.Set>)
-
-
-<a name="RabbitMQClient"></a>
-## type RabbitMQClient
-
-
-
-```go
-type RabbitMQClient struct {
-    // contains filtered or unexported fields
-}
-```
-
-<a name="NewRabbitMQClient"></a>
-### func NewRabbitMQClient
-
-```go
-func NewRabbitMQClient(url string) (*RabbitMQClient, error)
-```
-
-
-
-<a name="RabbitMQClient.Close"></a>
-### func \(\*RabbitMQClient\) Close
-
-```go
-func (r *RabbitMQClient) Close()
-```
-
-
-
-<a name="RabbitMQClient.Consume"></a>
-### func \(\*RabbitMQClient\) Consume
-
-```go
-func (r *RabbitMQClient) Consume() (<-chan amqp091.Delivery, error)
-```
-
-
-
-<a name="RabbitMQClient.Publish"></a>
-### func \(\*RabbitMQClient\) Publish
-
-```go
-func (r *RabbitMQClient) Publish(ctx context.Context, body []byte) error
-```
-
-here i am publishing with context bcz currently the amqp lib doesn't impleemt syscall lv; interrrupts but has some preflight optimization in\-place. it is so bcz amqp091, a fork of streadway/amqp, inherited the signature from its parent fut not yet fully implemeted it. In casein future, if it ever gets implemented, the code will already be ready with the nneded tools and can be updated hassle free
-
-<a name="RedisClient"></a>
-## type RedisClient
-
-dfn of my client
-
-```go
-type RedisClient struct {
-    // contains filtered or unexported fields
-}
-```
-
-<a name="NewRedisClient"></a>
-### func NewRedisClient
-
-```go
-func NewRedisClient(url string) (*RedisClient, error)
-```
-
-redis connetion handshaker function \- kept a retry duration of 5secs
-
-<a name="RedisClient.Del"></a>
-### func \(\*RedisClient\) Del
-
-```go
-func (r *RedisClient) Del(ctx context.Context, key string) error
-```
-
-
-
-<a name="RedisClient.Get"></a>
-### func \(\*RedisClient\) Get
-
-```go
-func (r *RedisClient) Get(ctx context.Context, key string) (string, error)
-```
-
-
-
-<a name="RedisClient.Set"></a>
-### func \(\*RedisClient\) Set
-
-```go
-func (r *RedisClient) Set(ctx context.Context, key string, value any, exp time.Duration) error
-```
-
-
-
-# repository
-
-```go
-import "adv-bknd/internal/repository"
-```
-
-## Index
-
-- [type DB](<#DB>)
-  - [func NewDB\(dburl string, migfs fs.FS\) \(\*DB, error\)](<#NewDB>)
-- [type UserRepository](<#UserRepository>)
-  - [func NewUserRepository\(db \*DB\) \*UserRepository](<#NewUserRepository>)
-  - [func \(u \*UserRepository\) Create\(ctx context.Context, user \*domain.User\) error](<#UserRepository.Create>)
-  - [func \(u \*UserRepository\) DeleteUser\(ctx context.Context, id string\) error](<#UserRepository.DeleteUser>)
-  - [func \(u \*UserRepository\) GetUserById\(ctx context.Context, id string\) \(\*domain.User, error\)](<#UserRepository.GetUserById>)
-
-
-<a name="DB"></a>
-## type DB
-
-i didn't directly use sql.DB everywhere bcz it is possiblr that at a later stage i would want to may be add a mutex which may break the app so just thought of keeping a low cost abstraction for future usability
-
-```go
-type DB struct {
-    *sql.DB
-}
-```
-
-<a name="NewDB"></a>
-### func NewDB
-
-```go
-func NewDB(dburl string, migfs fs.FS) (*DB, error)
-```
-
-inits the DB and makes the migs actually run
-
-<a name="UserRepository"></a>
-## type UserRepository
-
-
-
-```go
-type UserRepository struct {
-    // contains filtered or unexported fields
-}
-```
-
-<a name="NewUserRepository"></a>
-### func NewUserRepository
-
-```go
-func NewUserRepository(db *DB) *UserRepository
-```
-
-
-
-<a name="UserRepository.Create"></a>
-### func \(\*UserRepository\) Create
-
-```go
-func (u *UserRepository) Create(ctx context.Context, user *domain.User) error
-```
-
-
-
-<a name="UserRepository.DeleteUser"></a>
-### func \(\*UserRepository\) DeleteUser
-
-```go
-func (u *UserRepository) DeleteUser(ctx context.Context, id string) error
-```
-
-
-
-<a name="UserRepository.GetUserById"></a>
-### func \(\*UserRepository\) GetUserById
-
-```go
-func (u *UserRepository) GetUserById(ctx context.Context, id string) (*domain.User, error)
-```
-
-
-
-# service
-
-```go
-import "adv-bknd/internal/service"
-```
-
-## Index
-
-- [type UserService](<#UserService>)
-  - [func NewUserService\(repo \*repository.UserRepository, redis \*infrastructure.RedisClient, rabbitmq \*infrastructure.RabbitMQClient\) \*UserService](<#NewUserService>)
-  - [func \(u \*UserService\) DeleteUser\(ctx context.Context, userID string\) error](<#UserService.DeleteUser>)
-  - [func \(u \*UserService\) GetUser\(ctx context.Context, userID string\) \(\*domain.User, error\)](<#UserService.GetUser>)
-  - [func \(u \*UserService\) Register\(ctx context.Context, email string, passwd string\) \(\*domain.User, error\)](<#UserService.Register>)
-
-
-<a name="UserService"></a>
-## type UserService
-
-
-
-```go
-type UserService struct {
-    // contains filtered or unexported fields
-}
-```
-
-<a name="NewUserService"></a>
-### func NewUserService
-
-```go
-func NewUserService(repo *repository.UserRepository, redis *infrastructure.RedisClient, rabbitmq *infrastructure.RabbitMQClient) *UserService
-```
-
-
-
-<a name="UserService.DeleteUser"></a>
-### func \(\*UserService\) DeleteUser
-
-```go
-func (u *UserService) DeleteUser(ctx context.Context, userID string) error
-```
-
-
-
-<a name="UserService.GetUser"></a>
-### func \(\*UserService\) GetUser
-
-```go
-func (u *UserService) GetUser(ctx context.Context, userID string) (*domain.User, error)
-```
-
-try for a cache hit if cache missed, go for a db fetch, but but but there is a chance that a cache\-stampede may happen to avoid that, we are using SingleFlight here
-
-<a name="UserService.Register"></a>
-### func \(\*UserService\) Register
-
-```go
-func (u *UserService) Register(ctx context.Context, email string, passwd string) (*domain.User, error)
-```
-
-say the rabbitmq crashed or smth wrong happens with it, it bare minimum the user creation surely takes place if th required contraints required for it s creations are satisfied
-
-# http
-
-```go
-import "adv-bknd/internal/transport/http"
-```
-
-## Index
-
-- [func LoggingMiddleware\(next http.Handler\) http.Handler](<#LoggingMiddleware>)
-- [func RecoveryMiddleware\(next http.Handler\) http.Handler](<#RecoveryMiddleware>)
-- [type CreateUserRequest](<#CreateUserRequest>)
-- [type Handler](<#Handler>)
-  - [func NewHandler\(service \*service.UserService\) \*Handler](<#NewHandler>)
-  - [func \(h \*Handler\) CreateUser\(w http.ResponseWriter, r \*http.Request\)](<#Handler.CreateUser>)
-  - [func \(h \*Handler\) DeleteUser\(w http.ResponseWriter, r \*http.Request\)](<#Handler.DeleteUser>)
-  - [func \(h \*Handler\) GetUser\(w http.ResponseWriter, r \*http.Request\)](<#Handler.GetUser>)
-  - [func \(h \*Handler\) RegisterRoutes\(mux \*http.ServeMux\)](<#Handler.RegisterRoutes>)
-
-
-<a name="LoggingMiddleware"></a>
-## func LoggingMiddleware
-
-```go
-func LoggingMiddleware(next http.Handler) http.Handler
-```
-
-
-
-<a name="RecoveryMiddleware"></a>
-## func RecoveryMiddleware
-
-```go
-func RecoveryMiddleware(next http.Handler) http.Handler
-```
-
-
-
-<a name="CreateUserRequest"></a>
-## type CreateUserRequest
-
-
-
-```go
-type CreateUserRequest struct {
-    Email    string `json:"email"`
-    Password string `json:"password"`
-}
-```
-
-<a name="Handler"></a>
-## type Handler
-
-
-
-```go
-type Handler struct {
-    // contains filtered or unexported fields
-}
-```
-
-<a name="NewHandler"></a>
-### func NewHandler
-
-```go
-func NewHandler(service *service.UserService) *Handler
-```
-
-
-
-<a name="Handler.CreateUser"></a>
-### func \(\*Handler\) CreateUser
-
-```go
-func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request)
-```
-
-
-
-<a name="Handler.DeleteUser"></a>
-### func \(\*Handler\) DeleteUser
-
-```go
-func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request)
-```
-
-
-
-<a name="Handler.GetUser"></a>
-### func \(\*Handler\) GetUser
-
-```go
-func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request)
-```
-
-
-
-<a name="Handler.RegisterRoutes"></a>
-### func \(\*Handler\) RegisterRoutes
-
-```go
-func (h *Handler) RegisterRoutes(mux *http.ServeMux)
-```
-
-
-
-Generated by [gomarkdoc](<https://github.com/princjef/gomarkdoc>)
-
