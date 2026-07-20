@@ -43,3 +43,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-19T11:19:00+05:30 - rename module to usersvc
 - 2026-07-19T17:27:00+05:30 - refresh backend README after cleanup
 - 2026-07-20T08:37:00+05:30 - add frontend package manifest
+- 2026-07-20T11:25:00+05:30 - add frontend HTML and React entrypoints
