@@ -48,3 +48,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-20T21:54:00+05:30 - style responsive frontend dashboard
 - 2026-07-21T09:42:00+05:30 - add frontend Docker and nginx config
 - 2026-07-21T15:03:00+05:30 - add frontend service to compose
+- 2026-07-22T10:46:00+05:30 - connect UI to live users list
