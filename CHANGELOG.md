@@ -50,3 +50,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-21T15:03:00+05:30 - add frontend service to compose
 - 2026-07-22T10:46:00+05:30 - connect UI to live users list
 - 2026-07-22T18:24:00+05:30 - add embedded worker runtime flag
+- 2026-07-23T08:59:00+05:30 - add health endpoint
