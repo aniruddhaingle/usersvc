@@ -52,3 +52,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-22T18:24:00+05:30 - add embedded worker runtime flag
 - 2026-07-23T08:59:00+05:30 - add health endpoint
 - 2026-07-23T12:41:00+05:30 - add Render deployment blueprint
+- 2026-07-23T19:33:00+05:30 - add Vercel frontend rewrite
