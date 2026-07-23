@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: usersvc-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: HTTP_PORT
+        value: "10000"
+      - key: EMBED_WORKER
+        value: "true"
+      - key: DB_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: RABBITMQ_URL
+        sync: false
