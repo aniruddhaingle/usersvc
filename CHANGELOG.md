@@ -54,3 +54,4 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-23T12:41:00+05:30 - add Render deployment blueprint
 - 2026-07-23T19:33:00+05:30 - add Vercel frontend rewrite
 - 2026-07-24T09:16:00+05:30 - fix deployed API proxy target
+- 2026-07-24T13:52:00+05:30 - pin Vercel framework build settings
