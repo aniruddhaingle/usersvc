@@ -77,3 +77,9 @@ Reconstructed July timeline from verified project notes and repository state.
 - Added warning logs for cache read/write failures.
 - Added ListUsers in repository, service, and HTTP transport.
 - 2026-07-25T11:42:00+05:30 - document cache and list endpoint work
+
+## Tests
+- Added service fakes for cache hit, miss, and singleflight behavior.
+- Added handler stubs for duplicate email and not-found responses.
+- Kept fakes aligned with cache-miss semantics.
+- 2026-07-25T12:37:00+05:30 - document backend test coverage
