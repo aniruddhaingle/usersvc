@@ -64,3 +64,10 @@ Reconstructed July timeline from verified project notes and repository state.
 - Fixed user lookup and delete SQL/route issues.
 - Corrected RabbitMQ JSON content type and cleaned Go dependencies.
 - 2026-07-25T09:05:00+05:30 - document backend bug fixes
+
+## Backend Hardening
+- Aligned Docker builder version and removed duplicate build stage.
+- Added sentinel repository errors and driver-level duplicate email detection.
+- Introduced service interfaces for repository, cache, and publisher dependencies.
+- Added graceful API shutdown and improved worker failure handling.
+- 2026-07-25T10:18:00+05:30 - document backend hardening work
