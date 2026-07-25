@@ -83,3 +83,9 @@ Reconstructed July timeline from verified project notes and repository state.
 - Added handler stubs for duplicate email and not-found responses.
 - Kept fakes aligned with cache-miss semantics.
 - 2026-07-25T12:37:00+05:30 - document backend test coverage
+
+## Frontend
+- Created a Vite React app with user creation, lookup, list, and delete flows.
+- Added responsive styling and Docker/nginx deployment support.
+- Wired the UI to the real GET /users endpoint and refresh behavior.
+- 2026-07-25T13:55:00+05:30 - document frontend buildout
