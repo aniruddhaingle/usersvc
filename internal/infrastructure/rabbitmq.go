@@ -34,7 +34,7 @@ func NewRabbitMQClient(url string) (*RabbitMQClient, error) {
 func (r *RabbitMQClient) Publish(ctx context.Context, body []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	return r.channel.PublishWithContext(ctx, "", r.queue.Name, false, false, amqp091.Publishing{ContentType: "application/body", Body: body})
+	return r.channel.PublishWithContext(ctx, "", r.queue.Name, false, false, amqp091.Publishing{ContentType: "application/json", Body: body})
 
 }
 

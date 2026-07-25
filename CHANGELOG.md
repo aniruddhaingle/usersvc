@@ -112,3 +112,8 @@ Reconstructed July timeline from verified project notes and repository state.
 - Ran cached-read load testing with bombardier.
 - Captured latency percentiles and rewrote performance notes with measured caveats.
 - 2026-07-25T19:15:00+05:30 - document benchmarking results workflow
+
+## Baseline
+- The original codebase already had layered backend structure, config, repository, infrastructure, service, transport, migrations, Docker, Compose, and README documentation.
+- The reconstructed commits separate baseline import from subsequent project changes.
+- 2026-07-25T20:33:00+05:30 - document original baseline scope
