@@ -95,3 +95,9 @@ Reconstructed July timeline from verified project notes and repository state.
 - Added repository hygiene files and cleaned README claims.
 - Preserved authorship cleanup and history maintenance notes outside code commits.
 - 2026-07-25T15:04:00+05:30 - document repo cleanup and rename
+
+## Deployment
+- Added embedded worker support, Render blueprint, health checks, and frontend rewrites.
+- Verified managed Postgres, Redis, RabbitMQ, Render, and Vercel configuration.
+- Corrected Vercel root/framework settings and public API routing.
+- 2026-07-25T16:26:00+05:30 - document deployment work
