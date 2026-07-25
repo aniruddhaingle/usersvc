@@ -89,3 +89,9 @@ Reconstructed July timeline from verified project notes and repository state.
 - Added responsive styling and Docker/nginx deployment support.
 - Wired the UI to the real GET /users endpoint and refresh behavior.
 - 2026-07-25T13:55:00+05:30 - document frontend buildout
+
+## Repo Cleanup
+- Renamed the module to usersvc and cleaned touched Go files.
+- Added repository hygiene files and cleaned README claims.
+- Preserved authorship cleanup and history maintenance notes outside code commits.
+- 2026-07-25T15:04:00+05:30 - document repo cleanup and rename
