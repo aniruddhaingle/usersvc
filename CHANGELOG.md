@@ -107,3 +107,8 @@ Reconstructed July timeline from verified project notes and repository state.
 - Rebuilt the Docker stack and verified create, duplicate, get, cache-hit, delete, and migration restart behavior.
 - Confirmed live cloud end-to-end behavior after local Docker was off.
 - 2026-07-25T17:48:00+05:30 - document verification runs
+
+## Benchmarking
+- Ran cached-read load testing with bombardier.
+- Captured latency percentiles and rewrote performance notes with measured caveats.
+- 2026-07-25T19:15:00+05:30 - document benchmarking results workflow
