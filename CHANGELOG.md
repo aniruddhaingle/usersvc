@@ -57,3 +57,10 @@ Reconstructed July timeline from verified project notes and repository state.
 - 2026-07-24T13:52:00+05:30 - pin Vercel framework build settings
 - 2026-07-24T21:10:00+05:30 - document measured performance results
 - 2026-07-25T08:20:00+05:30 - start verified project changelog
+
+## Backend Bug Fixes
+- Registered the pgx SQL driver for database/sql.
+- Checked migration constructor errors and treated ErrNoChange as success.
+- Fixed user lookup and delete SQL/route issues.
+- Corrected RabbitMQ JSON content type and cleaned Go dependencies.
+- 2026-07-25T09:05:00+05:30 - document backend bug fixes
