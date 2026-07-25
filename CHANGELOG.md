@@ -71,3 +71,9 @@ Reconstructed July timeline from verified project notes and repository state.
 - Introduced service interfaces for repository, cache, and publisher dependencies.
 - Added graceful API shutdown and improved worker failure handling.
 - 2026-07-25T10:18:00+05:30 - document backend hardening work
+
+## Cache And Listing
+- Treated Redis nil responses as cache misses.
+- Added warning logs for cache read/write failures.
+- Added ListUsers in repository, service, and HTTP transport.
+- 2026-07-25T11:42:00+05:30 - document cache and list endpoint work
